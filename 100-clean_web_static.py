@@ -1,27 +1,33 @@
-from fabric.api import env, local, run, cd
-import os
+#!/usr/bin/python3
+"""
+Deletes out-of-date archives
+fab -f 100-clean_web_static.py do_clean:number=2
+    -i ssh-key -u ubuntu > /dev/null 2>&1
+"""
 
-# Define the list of web servers
+import os
+from fabric.api import *
+
 env.hosts = ['52.91.154.128', '54.236.41.153']
 
+
 def do_clean(number=0):
-    """Delete out-of-date archives."""
-    number = 1 if int(number) <= 1 else int(number)
+    """Delete out-of-date archives.
+    Args:
+        number (int): The number of archives to keep.
+    If number is 0 or 1, keeps only the most recent archive. If
+    number is 2, keeps the most and second-most recent archives,
+    etc.
+    """
+    number = 1 if int(number) == 0 else int(number)
 
-    # Delete unnecessary archives in the versions folder locally
-    local_archives = sorted(os.listdir("versions"))
-    local_archives_to_keep = local_archives[-number:]
-    local_archives_to_delete = [a for a in local_archives if a not in local_archives_to_keep]
-    for archive in local_archives_to_delete:
-        local("rm versions/{}".format(archive))
+    archives = sorted(os.listdir("versions"))
+    [archives.pop() for i in range(number)]
+    with lcd("versions"):
+        [local("rm ./{}".format(a)) for a in archives]
 
-    # Delete unnecessary archives in the /data/web_static/releases folder remotely
     with cd("/data/web_static/releases"):
-        remote_archives = run("ls -tr").split()
-        remote_archives = [a for a in remote_archives if "web_static_" in a]
-        remote_archives_to_keep = remote_archives[-number:]
-        remote_archives_to_delete = [a for a in remote_archives if a not in remote_archives_to_keep]
-        for archive in remote_archives_to_delete:
-            run("rm -rf {}".format(archive))
-
-
+        archives = run("ls -tr").split()
+        archives = [a for a in archives if "web_static_" in a]
+        [archives.pop() for i in range(number)]
+        [run("rm -rf ./{}".format(a)) for a in archives]
